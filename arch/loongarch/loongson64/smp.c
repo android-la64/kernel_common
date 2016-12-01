@@ -246,7 +246,7 @@ static void loongson3_smp_finish(void)
 	else
 		xconf_writeq(0, ipi_mailbox_buf[cpu_logical_map(cpu)]+0x0);
 
-	pr_info("CPU#%d finished\n", smp_processor_id());
+	pr_verbose("CPU#%d finished\n", smp_processor_id());
 }
 
 static void __init loongson3_smp_setup(void)
@@ -291,7 +291,7 @@ static int loongson3_boot_secondary(int cpu, struct task_struct *idle)
 {
 	unsigned long entry;
 
-	pr_info("Booting CPU#%d...\n", cpu);
+	pr_verbose("Booting CPU#%d...\n", cpu);
 
 	entry = __pa_symbol((unsigned long)&smpboot_entry);
 	cpuboot_data.task = (unsigned long)idle;
