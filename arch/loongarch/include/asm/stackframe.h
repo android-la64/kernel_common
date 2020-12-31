@@ -180,6 +180,10 @@
 #endif
 	LONG_L	tp, t1, 0
 9:
+#ifdef CONFIG_KGDB
+	li.w	t0, CSR_CRMD_WE
+	csrxchg	t0, t0, LOONGARCH_CSR_CRMD
+#endif
 	UNWIND_HINT_REGS
 	.endm
 
