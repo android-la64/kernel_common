@@ -450,6 +450,7 @@ void __init setup_arch(char **cmdline_p)
 
 	early_init();
 	pagetable_init();
+	jump_label_init(); /* Initialise the static keys for early params */
 	parse_early_param();
 	reserve_initrd_mem();
 
