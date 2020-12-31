@@ -27,6 +27,7 @@ struct extctx_layout {
 	struct _ctx_layout fpu;
 	struct _ctx_layout lsx;
 	struct _ctx_layout lasx;
+	struct _ctx_layout lbt;
 	struct _ctx_layout end;
 };
 
