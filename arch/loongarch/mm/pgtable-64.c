@@ -5,6 +5,7 @@
 #include <linux/export.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <asm/fixmap.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
@@ -102,6 +103,8 @@ void set_pmd_at(struct mm_struct *mm, unsigned long addr,
 
 void __init pagetable_init(void)
 {
+	unsigned long vaddr;
+
 	/* Initialize the entire pgd.  */
 	pgd_init((unsigned long)swapper_pg_dir);
 	pgd_init((unsigned long)invalid_pg_dir);
@@ -110,5 +113,22 @@ void __init pagetable_init(void)
 #endif
 #ifndef __PAGETABLE_PMD_FOLDED
 	pmd_init((unsigned long)invalid_pmd_table, (unsigned long)invalid_pte_table);
+#endif
+
+#ifdef CONFIG_HIGHMEM
+	/* Permanent kmaps */
+	vaddr = PKMAP_BASE;
+	fixrange_init(vaddr & PMD_MASK, vaddr + PAGE_SIZE * LAST_PKMAP, swapper_pg_dir);
+
+	pgd = swapper_pg_dir + pgd_index(vaddr);
+	p4d = p4d_offset(pgd, vaddr);
+	pud = pud_offset(p4d, vaddr);
+	pmd = pmd_offset(pud, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
+	pkmap_page_table = pte;
+
+	/* Fixed mappings */
+	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1);
+	fixrange_init(vaddr & PMD_MASK, vaddr + FIXADDR_SIZE, swapper_pg_dir);
 #endif
 }
