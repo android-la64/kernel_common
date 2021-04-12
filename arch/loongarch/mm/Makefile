@@ -8,4 +8,5 @@ obj-y				+= init.o cache.o tlb.o tlbex.o extable.o \
 				   page.o pageattr.o
 
 obj-$(CONFIG_64BIT)		+= pgtable-64.o
+obj-$(CONFIG_HIGHMEM)		+= highmem.o
 obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
