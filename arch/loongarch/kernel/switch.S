@@ -28,6 +28,11 @@ SYM_FUNC_START(__switch_to)
 	stptr.d	ra, a0, THREAD_REG01
 	stptr.d a2, a0, THREAD_SCHED_RA
 	stptr.d a3, a0, THREAD_SCHED_CFA
+#if defined(CONFIG_STACKPROTECTOR) && !defined(CONFIG_SMP)
+	la	t7, __stack_chk_guard
+	LONG_L	t8, a1, TASK_STACK_CANARY
+	LONG_S	t8, t7, 0
+#endif
 	move	tp, a1
 	cpu_restore_nonscratch a1
 
