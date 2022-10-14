@@ -459,6 +459,7 @@ static int __init event_init(struct generic_sub_driver *sub_driver)
 	if (ret < 0) {
 		pr_err("Failed to setup input device keymap\n");
 		input_free_device(generic_inputdev);
+		generic_inputdev = NULL;
 
 		return ret;
 	}
@@ -512,8 +513,11 @@ static int __init generic_subdriver_init(struct generic_sub_driver *sub_driver)
 	if (ret)
 		return -EINVAL;
 
-	if (sub_driver->init)
-		sub_driver->init(sub_driver);
+	if (sub_driver->init) {
+		ret = sub_driver->init(sub_driver);
+		if (ret)
+			goto err_out;
+	}
 
 	if (sub_driver->notify) {
 		ret = setup_acpi_notify(sub_driver);
@@ -529,7 +533,7 @@ static int __init generic_subdriver_init(struct generic_sub_driver *sub_driver)
 
 err_out:
 	generic_subdriver_exit(sub_driver);
-	return (ret < 0) ? ret : 0;
+	return ret;
 }
 
 static void generic_subdriver_exit(struct generic_sub_driver *sub_driver)
