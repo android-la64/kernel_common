@@ -14,6 +14,8 @@
 #include <asm/pgtable-64.h>
 #endif
 
+#define INVTLB_ADDR_GFALSE_AND_ASID	5
+
 #define PTRS_PER_PGD_BITS	(PAGE_SHIFT - 3)
 #define PTRS_PER_PUD_BITS	(PAGE_SHIFT - 3)
 #define PTRS_PER_PMD_BITS	(PAGE_SHIFT - 3)
@@ -126,6 +128,8 @@ vmalloc_load:
 tlb_huge_update_load:
 #ifdef CONFIG_SMP
 	ll.d		ra, t1, 0
+#else
+	rotri.d		ra, ra, 64 - (_PAGE_HUGE_SHIFT + 1)
 #endif
 	andi		t0, ra, _PAGE_PRESENT
 	beqz		t0, nopage_tlb_load
@@ -136,17 +140,13 @@ tlb_huge_update_load:
 	beqz		t0, tlb_huge_update_load
 	ori		t0, ra, _PAGE_VALID
 #else
-	rotri.d		ra, ra, 64 - (_PAGE_HUGE_SHIFT + 1)
 	ori		t0, ra, _PAGE_VALID
 	st.d		t0, t1, 0
 #endif
-	tlbsrch
-	addu16i.d	t1, zero, -(CSR_TLBIDX_EHINV >> 16)
-	addi.d		ra, t1, 0
-	csrxchg		ra, t1, LOONGARCH_CSR_TLBIDX
-	tlbwr
-
-	csrxchg		zero, t1, LOONGARCH_CSR_TLBIDX
+	csrrd		ra, LOONGARCH_CSR_ASID
+	csrrd		t1, LOONGARCH_CSR_BADV
+	andi		ra, ra, CSR_ASID_ASID
+	invtlb		INVTLB_ADDR_GFALSE_AND_ASID, ra, t1
 
 	/*
 	 * A huge PTE describes an area the size of the
@@ -276,6 +276,8 @@ vmalloc_store:
 tlb_huge_update_store:
 #ifdef CONFIG_SMP
 	ll.d		ra, t1, 0
+#else
+	rotri.d		ra, ra, 64 - (_PAGE_HUGE_SHIFT + 1)
 #endif
 	andi		t0, ra, _PAGE_PRESENT | _PAGE_WRITE
 	xori		t0, t0, _PAGE_PRESENT | _PAGE_WRITE
@@ -287,17 +289,14 @@ tlb_huge_update_store:
 	beqz		t0, tlb_huge_update_store
 	ori		t0, ra, (_PAGE_VALID | _PAGE_DIRTY | _PAGE_MODIFIED)
 #else
-	rotri.d		ra, ra, 64 - (_PAGE_HUGE_SHIFT + 1)
 	ori		t0, ra, (_PAGE_VALID | _PAGE_DIRTY | _PAGE_MODIFIED)
 	st.d		t0, t1, 0
 #endif
-	tlbsrch
-	addu16i.d	t1, zero, -(CSR_TLBIDX_EHINV >> 16)
-	addi.d		ra, t1, 0
-	csrxchg		ra, t1, LOONGARCH_CSR_TLBIDX
-	tlbwr
+	csrrd		ra, LOONGARCH_CSR_ASID
+	csrrd		t1, LOONGARCH_CSR_BADV
+	andi		ra, ra, CSR_ASID_ASID
+	invtlb		INVTLB_ADDR_GFALSE_AND_ASID, ra, t1
 
-	csrxchg		zero, t1, LOONGARCH_CSR_TLBIDX
 	/*
 	 * A huge PTE describes an area the size of the
 	 * configured huge page size. This is twice the
@@ -426,6 +425,8 @@ vmalloc_modify:
 tlb_huge_update_modify:
 #ifdef CONFIG_SMP
 	ll.d		ra, t1, 0
+#else
+	rotri.d		ra, ra, 64 - (_PAGE_HUGE_SHIFT + 1)
 #endif
 	andi		t0, ra, _PAGE_WRITE
 	beqz		t0, nopage_tlb_modify
@@ -436,10 +437,14 @@ tlb_huge_update_modify:
 	beqz		t0, tlb_huge_update_modify
 	ori		t0, ra, (_PAGE_VALID | _PAGE_DIRTY | _PAGE_MODIFIED)
 #else
-	rotri.d		ra, ra, 64 - (_PAGE_HUGE_SHIFT + 1)
 	ori		t0, ra, (_PAGE_VALID | _PAGE_DIRTY | _PAGE_MODIFIED)
 	st.d		t0, t1, 0
 #endif
+	csrrd		ra, LOONGARCH_CSR_ASID
+	csrrd		t1, LOONGARCH_CSR_BADV
+	andi		ra, ra, CSR_ASID_ASID
+	invtlb		INVTLB_ADDR_GFALSE_AND_ASID, ra, t1
+
 	/*
 	 * A huge PTE describes an area the size of the
 	 * configured huge page size. This is twice the
@@ -470,7 +475,7 @@ tlb_huge_update_modify:
 	addu16i.d	t1, zero, (PS_HUGE_SIZE << (CSR_TLBIDX_PS_SHIFT - 16))
 	csrxchg		t1, t0, LOONGARCH_CSR_TLBIDX
 
-	tlbwr
+	tlbfill
 
 	/* Reset default page size */
 	addu16i.d	t0, zero, (CSR_TLBIDX_PS >> 16)
