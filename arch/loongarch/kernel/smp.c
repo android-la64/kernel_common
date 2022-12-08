@@ -130,6 +130,17 @@ void register_smp_ops(const struct plat_smp_ops *ops)
 }
 
 /*
+ * this function sends a 'reschedule' IPI to another CPU.
+ * it goes straight through and wastes no time serializing
+ * anything. Worst case is that we lose a reschedule ...
+ */
+void smp_send_reschedule(int cpu)
+{
+	mp_ops->send_ipi_single(cpu, SMP_RESCHEDULE);
+}
+EXPORT_SYMBOL_GPL(smp_send_reschedule);
+
+/*
  * First C code run on the secondary CPUs after being started up by
  * the master.
  */
