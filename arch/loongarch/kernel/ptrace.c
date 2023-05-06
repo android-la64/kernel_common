@@ -71,7 +71,6 @@ static int gpr_get(struct task_struct *target,
 	struct pt_regs *regs = task_pt_regs(target);
 
 	r = membuf_write(&to, &regs->regs, sizeof(u64) * GPR_NUM);
-	r = membuf_write(&to, &regs->orig_a0, sizeof(u64));
 	r = membuf_write(&to, &regs->csr_era, sizeof(u64));
 	r = membuf_write(&to, &regs->csr_badvaddr, sizeof(u64));
 
@@ -84,17 +83,13 @@ static int gpr_set(struct task_struct *target,
 		   const void *kbuf, const void __user *ubuf)
 {
 	int err;
-	int a0_start = sizeof(u64) * GPR_NUM;
-	int era_start = a0_start + sizeof(u64);
+	int era_start = sizeof(u64) * GPR_NUM;
 	int badvaddr_start = era_start + sizeof(u64);
 	struct pt_regs *regs = task_pt_regs(target);
 
 	err = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
 				 &regs->regs,
-				 0, a0_start);
-	err |= user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-				 &regs->orig_a0,
-				 a0_start, a0_start + sizeof(u64));
+				 0, era_start);
 	err |= user_regset_copyin(&pos, &count, &kbuf, &ubuf,
 				 &regs->csr_era,
 				 era_start, era_start + sizeof(u64));
@@ -404,7 +399,6 @@ static const struct pt_regs_offset regoffset_table[] = {
 	REG_OFFSET_NAME(r29, regs[29]),
 	REG_OFFSET_NAME(r30, regs[30]),
 	REG_OFFSET_NAME(r31, regs[31]),
-	REG_OFFSET_NAME(orig_a0, orig_a0),
 	REG_OFFSET_NAME(csr_era, csr_era),
 	REG_OFFSET_NAME(csr_badvaddr, csr_badvaddr),
 	REG_OFFSET_NAME(csr_crmd, csr_crmd),
@@ -525,9 +519,6 @@ static inline int read_user(struct task_struct *target, unsigned long addr,
 	case 0 ... 31:
 		tmp = task_pt_regs(target)->regs[addr];
 		break;
-	case ARG0:
-		tmp = task_pt_regs(target)->orig_a0;
-		break;
 	case PC:
 		tmp = task_pt_regs(target)->csr_era;
 		break;
@@ -547,9 +538,6 @@ static inline int write_user(struct task_struct *target, unsigned long addr,
 	switch (addr) {
 	case 0 ... 31:
 		task_pt_regs(target)->regs[addr] = data;
-		break;
-	case ARG0:
-		task_pt_regs(target)->orig_a0 = data;
 		break;
 	case PC:
 		task_pt_regs(target)->csr_era = data;
