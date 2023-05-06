@@ -4,7 +4,11 @@
 
 #include <linux/types.h>
 
+#ifndef __loongarch__
 #define _NSIG		64
+#else
+#define _NSIG		128
+#endif
 #define _NSIG_BPW	__BITS_PER_LONG
 #define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
 

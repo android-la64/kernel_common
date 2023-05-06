@@ -11,59 +11,31 @@
 #include <linux/posix_types.h>
 
 /* FP context was used */
-#define SC_USED_FP		(1 << 0)
+#define USED_FP			(1 << 0)
 /* Address error was due to memory load */
-#define SC_ADDRERR_RD		(1 << 30)
+#define ADRERR_RD		(1 << 30)
 /* Address error was due to memory store */
-#define SC_ADDRERR_WR		(1 << 31)
+#define ADRERR_WR		(1 << 31)
+
+#define FPU_REG_WIDTH		256
+#define FPU_ALIGN		__attribute__((aligned(32)))
 
 struct sigcontext {
 	__u64	sc_pc;
 	__u64	sc_regs[32];
 	__u32	sc_flags;
-	__u64	sc_extcontext[0] __attribute__((__aligned__(16)));
-};
+	__u32	sc_fcsr;
+	__u32	sc_vcsr;
+	__u64	sc_fcc;
+	/* For Binary Translation */
+	__u64	sc_scr[4];
+	union {
+		__u32	val32[FPU_REG_WIDTH / 32];
+		__u64	val64[FPU_REG_WIDTH / 64];
+	} sc_fpregs[32] FPU_ALIGN;
 
-#define CONTEXT_INFO_ALIGN	16
-struct sctx_info {
-	__u32	magic;
-	__u32	size;
-	__u64	padding;	/* padding to 16 bytes */
-};
-
-/* FPU context */
-#define FPU_CTX_MAGIC		0x46505501
-#define FPU_CTX_ALIGN		8
-struct fpu_context {
-	__u64	regs[32];
-	__u64	fcc;
-	__u32	fcsr;
-};
-
-/* LSX context */
-#define LSX_CTX_MAGIC		0x53580001
-#define LSX_CTX_ALIGN		16
-struct lsx_context {
-	__u64	regs[2*32];
-	__u64	fcc;
-	__u32	fcsr;
-};
-
-/* LASX context */
-#define LASX_CTX_MAGIC		0x41535801
-#define LASX_CTX_ALIGN		32
-struct lasx_context {
-	__u64	regs[4*32];
-	__u64	fcc;
-	__u32	fcsr;
-};
-
-/* LBT context */
-#define LBT_CTX_MAGIC		0x42540001
-#define LBT_CTX_ALIGN		8
-struct lbt_context {
-	__u64	scr[4];
-	__u32	eflags;
+	/* Reserved for future scalable vectors */
+	__u8	sc_reserved[4096] __attribute__((__aligned__(16)));
 };
 
 #endif /* _UAPI_ASM_SIGCONTEXT_H */

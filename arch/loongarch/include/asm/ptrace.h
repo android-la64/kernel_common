@@ -19,9 +19,6 @@ struct pt_regs {
 	/* Main processor registers. */
 	unsigned long regs[32];
 
-	/* Original syscall arg0. */
-	unsigned long orig_a0;
-
 	/* Special CSR registers. */
 	unsigned long csr_era;
 	unsigned long csr_badvaddr;
@@ -30,6 +27,7 @@ struct pt_regs {
 	unsigned long csr_euen;
 	unsigned long csr_ecfg;
 	unsigned long csr_estat;
+	unsigned long orig_a0;
 	unsigned long __last[];
 } __aligned(8);
 

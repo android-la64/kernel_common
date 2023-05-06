@@ -381,7 +381,6 @@ void loongarch_dump_regs64(u64 *uregs, const struct pt_regs *regs)
 		uregs[i] = regs->regs[i - LOONGARCH_EF_R0];
 	}
 
-	uregs[LOONGARCH_EF_ORIG_A0] = regs->orig_a0;
 	uregs[LOONGARCH_EF_CSR_ERA] = regs->csr_era;
 	uregs[LOONGARCH_EF_CSR_BADV] = regs->csr_badvaddr;
 	uregs[LOONGARCH_EF_CSR_CRMD] = regs->csr_crmd;

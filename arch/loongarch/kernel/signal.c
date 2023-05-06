@@ -35,572 +35,454 @@
 
 #include "signal-common.h"
 
+static int (*save_fp_context)(struct sigcontext __user *sc);
+static int (*restore_fp_context)(struct sigcontext __user *sc);
+
 struct rt_sigframe {
+	u32 rs_ass[4];		/* argument save space for o32 */
+	u32 rs_pad[2];		/* Was: signal trampoline */
 	struct siginfo rs_info;
 	struct ucontext rs_uctx;
 };
-
-static void __user *get_ctx_through_ctxinfo(struct sctx_info *info)
-{
-	return (void __user *)((char *)info + sizeof(struct sctx_info));
-}
 
 /*
  * Thread saved context copy to/from a signal context presumed to be on the
  * user stack, and therefore accessed with appropriate macros from uaccess.h.
  */
-static int copy_fpu_to_sigcontext(struct fpu_context __user *ctx)
+static int copy_fp_to_sigcontext(struct sigcontext __user *sc)
 {
 	int i;
 	int err = 0;
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	int inc = 1;
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *csr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
 
-	for (i = 0; i < NUM_FPU_REGS; i++) {
+	for (i = 0; i < NUM_FPU_REGS; i += inc) {
 		err |=
 		    __put_user(get_fpr64(&current->thread.fpu.fpr[i], 0),
-			       &regs[i]);
+			       &fpregs[4*i]);
 	}
+	err |= __put_user(current->thread.fpu.fcsr, csr);
 	err |= __put_user(current->thread.fpu.fcc, fcc);
-	err |= __put_user(current->thread.fpu.fcsr, fcsr);
 
 	return err;
 }
 
-static int copy_fpu_from_sigcontext(struct fpu_context __user *ctx)
+static int copy_lsx_upper_to_sigcontext(struct sigcontext __user *sc)
 {
 	int i;
 	int err = 0;
-	u64 fpr_val;
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	int inc = 1;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
 
-	for (i = 0; i < NUM_FPU_REGS; i++) {
-		err |= __get_user(fpr_val, &regs[i]);
+	for (i = 0; i < NUM_FPU_REGS; i += inc) {
+		err |=
+		    __put_user(get_fpr64(&current->thread.fpu.fpr[i], 1),
+			       &fpregs[4*i+1]);
+	}
+
+	return err;
+}
+
+static int copy_lasx_upper_to_sigcontext(struct sigcontext __user *sc)
+{
+	int i;
+	int err = 0;
+	int inc = 1;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	for (i = 0; i < NUM_FPU_REGS; i += inc) {
+		err |=
+		    __put_user(get_fpr64(&current->thread.fpu.fpr[i], 2),
+			       &fpregs[4*i+2]);
+		err |=
+		    __put_user(get_fpr64(&current->thread.fpu.fpr[i], 3),
+			       &fpregs[4*i+3]);
+	}
+
+	return err;
+}
+
+static int copy_fp_from_sigcontext(struct sigcontext __user *sc)
+{
+	int i;
+	int err = 0;
+	int inc = 1;
+	u64 fpr_val;
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *csr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	for (i = 0; i < NUM_FPU_REGS; i += inc) {
+		err |= __get_user(fpr_val, &fpregs[4*i]);
 		set_fpr64(&current->thread.fpu.fpr[i], 0, fpr_val);
 	}
+	err |= __get_user(current->thread.fpu.fcsr, csr);
 	err |= __get_user(current->thread.fpu.fcc, fcc);
-	err |= __get_user(current->thread.fpu.fcsr, fcsr);
 
 	return err;
 }
 
-static int copy_lsx_to_sigcontext(struct lsx_context __user *ctx)
+static int copy_lsx_upper_from_sigcontext(struct sigcontext __user *sc)
 {
 	int i;
 	int err = 0;
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
-
-	for (i = 0; i < NUM_FPU_REGS; i++) {
-		err |= __put_user(get_fpr64(&current->thread.fpu.fpr[i], 0),
-				  &regs[2*i]);
-		err |= __put_user(get_fpr64(&current->thread.fpu.fpr[i], 1),
-				  &regs[2*i+1]);
-	}
-	err |= __put_user(current->thread.fpu.fcc, fcc);
-	err |= __put_user(current->thread.fpu.fcsr, fcsr);
-
-	return err;
-}
-
-static int copy_lsx_from_sigcontext(struct lsx_context __user *ctx)
-{
-	int i;
-	int err = 0;
+	int inc = 1;
 	u64 fpr_val;
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
 
-	for (i = 0; i < NUM_FPU_REGS; i++) {
-		err |= __get_user(fpr_val, &regs[2*i]);
-		set_fpr64(&current->thread.fpu.fpr[i], 0, fpr_val);
-		err |= __get_user(fpr_val, &regs[2*i+1]);
+	for (i = 0; i < NUM_FPU_REGS; i += inc) {
+		err |= __get_user(fpr_val, &fpregs[4*i+1]);
 		set_fpr64(&current->thread.fpu.fpr[i], 1, fpr_val);
 	}
-	err |= __get_user(current->thread.fpu.fcc, fcc);
-	err |= __get_user(current->thread.fpu.fcsr, fcsr);
 
 	return err;
 }
 
-static int copy_lasx_to_sigcontext(struct lasx_context __user *ctx)
+static int copy_lasx_upper_from_sigcontext(struct sigcontext __user *sc)
 {
 	int i;
 	int err = 0;
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
-
-	for (i = 0; i < NUM_FPU_REGS; i++) {
-		err |= __put_user(get_fpr64(&current->thread.fpu.fpr[i], 0),
-				  &regs[4*i]);
-		err |= __put_user(get_fpr64(&current->thread.fpu.fpr[i], 1),
-				  &regs[4*i+1]);
-		err |= __put_user(get_fpr64(&current->thread.fpu.fpr[i], 2),
-				  &regs[4*i+2]);
-		err |= __put_user(get_fpr64(&current->thread.fpu.fpr[i], 3),
-				  &regs[4*i+3]);
-	}
-	err |= __put_user(current->thread.fpu.fcc, fcc);
-	err |= __put_user(current->thread.fpu.fcsr, fcsr);
-
-	return err;
-}
-
-static int copy_lasx_from_sigcontext(struct lasx_context __user *ctx)
-{
-	int i;
-	int err = 0;
+	int inc = 1;
 	u64 fpr_val;
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
 
-	for (i = 0; i < NUM_FPU_REGS; i++) {
-		err |= __get_user(fpr_val, &regs[4*i]);
-		set_fpr64(&current->thread.fpu.fpr[i], 0, fpr_val);
-		err |= __get_user(fpr_val, &regs[4*i+1]);
-		set_fpr64(&current->thread.fpu.fpr[i], 1, fpr_val);
-		err |= __get_user(fpr_val, &regs[4*i+2]);
+	for (i = 0; i < NUM_FPU_REGS; i += inc) {
+		err |= __get_user(fpr_val, &fpregs[4*i+2]);
 		set_fpr64(&current->thread.fpu.fpr[i], 2, fpr_val);
-		err |= __get_user(fpr_val, &regs[4*i+3]);
+		err |= __get_user(fpr_val, &fpregs[4*i+3]);
 		set_fpr64(&current->thread.fpu.fpr[i], 3, fpr_val);
 	}
-	err |= __get_user(current->thread.fpu.fcc, fcc);
-	err |= __get_user(current->thread.fpu.fcsr, fcsr);
 
 	return err;
+}
+
+/*
+ * Wrappers for the assembly _{save,restore}_fp_context functions.
+ */
+static int save_hw_fp_context(struct sigcontext __user *sc)
+{
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	return _save_fp_context(fpregs, fcc, fcsr);
+}
+
+static int restore_hw_fp_context(struct sigcontext __user *sc)
+{
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *csr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	return _restore_fp_context(fpregs, fcc, csr);
+}
+
+static int save_lsx_context(struct sigcontext __user *sc)
+{
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	return _save_lsx_context(fpregs, fcc, fcsr);
+}
+
+static int restore_lsx_context(struct sigcontext __user *sc)
+{
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	return _restore_lsx_context(fpregs, fcc, fcsr);
+}
+
+static int save_lasx_context(struct sigcontext __user *sc)
+{
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	return _save_lasx_context(fpregs, fcc, fcsr);
+}
+
+static int restore_lasx_context(struct sigcontext __user *sc)
+{
+	uint64_t __user *fcc = &sc->sc_fcc;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	return _restore_lasx_context(fpregs, fcc, fcsr);
 }
 
 #if defined(CONFIG_CPU_HAS_LBT)
-static int copy_lbt_to_sigcontext(struct lbt_context __user *ctx)
+static int copy_lbt_to_sigcontext(struct sigcontext __user *sc)
 {
 	int err = 0;
-	uint64_t __user *scr	= (uint64_t *)&ctx->scr;
-	uint32_t __user *eflags	= (uint32_t *)&ctx->eflags;
+	uint64_t __user *scrregs = (uint64_t *)&sc->sc_scr;
+	uint32_t __user *eflags = (uint32_t *)&sc->sc_reserved;
 
-	err |= __put_user(current->thread.lbt.scr0, &scr[0]);
-	err |= __put_user(current->thread.lbt.scr1, &scr[1]);
-	err |= __put_user(current->thread.lbt.scr2, &scr[2]);
-	err |= __put_user(current->thread.lbt.scr3, &scr[3]);
+	err |= __put_user(current->thread.lbt.scr0, &scrregs[0]);
+	err |= __put_user(current->thread.lbt.scr1, &scrregs[1]);
+	err |= __put_user(current->thread.lbt.scr2, &scrregs[2]);
+	err |= __put_user(current->thread.lbt.scr3, &scrregs[3]);
+
 	err |= __put_user(current->thread.lbt.eflags, eflags);
 
 	return err;
 }
 
-static int copy_lbt_from_sigcontext(struct lbt_context __user *ctx)
+static int copy_lbt_from_sigcontext(struct sigcontext __user *sc)
 {
 	int err = 0;
-	uint64_t __user *scr	= (uint64_t *)&ctx->scr;
-	uint32_t __user *eflags	= (uint32_t *)&ctx->eflags;
+	uint64_t __user *scrregs = (uint64_t *)&sc->sc_scr;
+	uint32_t __user *eflags = (uint32_t *)&sc->sc_reserved;
 
-	err |= __get_user(current->thread.lbt.scr0, &scr[0]);
-	err |= __get_user(current->thread.lbt.scr1, &scr[1]);
-	err |= __get_user(current->thread.lbt.scr2, &scr[2]);
-	err |= __get_user(current->thread.lbt.scr3, &scr[3]);
+	err |= __get_user(current->thread.lbt.scr0, &scrregs[0]);
+	err |= __get_user(current->thread.lbt.scr1, &scrregs[1]);
+	err |= __get_user(current->thread.lbt.scr2, &scrregs[2]);
+	err |= __get_user(current->thread.lbt.scr3, &scrregs[3]);
+
 	err |= __get_user(current->thread.lbt.eflags, eflags);
 
 	return err;
 }
-#endif
 
-/*
- * Wrappers for the assembly _{save,restore}_fp_context functions.
- */
-static int save_hw_fpu_context(struct fpu_context __user *ctx)
+static int save_lbt_context(struct sigcontext __user *sc)
 {
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	uint64_t __user *scrregs = (uint64_t *)&sc->sc_scr;
+	uint32_t __user *eflags = (uint32_t *)&sc->sc_reserved;
 
-	return _save_fp_context(regs, fcc, fcsr);
+	return _save_scr_context(scrregs, eflags);
 }
 
-static int restore_hw_fpu_context(struct fpu_context __user *ctx)
+static int restore_lbt_context(struct sigcontext __user *sc)
 {
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	uint64_t __user *scrregs = (uint64_t *)&sc->sc_scr;
+	uint32_t __user *eflags = (uint32_t *)&sc->sc_reserved;
 
-	return _restore_fp_context(regs, fcc, fcsr);
+	return _restore_scr_context(scrregs, eflags);
 }
 
-static int save_hw_lsx_context(struct lsx_context __user *ctx)
+static int protected_save_lbt_context(struct sigcontext __user *sc)
 {
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	int err = 0;
+	uint64_t __user *scrregs = (uint64_t *)&sc->sc_scr;
+	uint32_t __user *eflags = (uint32_t *)&sc->sc_reserved;
 
-	return _save_lsx_context(regs, fcc, fcsr);
+	while (1) {
+		lock_fpu_owner();
+		if (thread_lbt_context_live()) {
+			if (is_lbt_owner()) {
+				save_lbt_context(sc);
+			} else {
+				err |= copy_lbt_to_sigcontext(sc);
+			}
+		}
+
+		unlock_fpu_owner();
+		if (likely(!err))
+			break;
+		/* touch the sigcontext and try again */
+		err = __put_user(0, &scrregs[0]) | __put_user(0, eflags);
+
+		if (err)
+			return err;
+	}
+
+	return err;
 }
 
-static int restore_hw_lsx_context(struct lsx_context __user *ctx)
+static int protected_restore_lbt_context(struct sigcontext __user *sc)
 {
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+	int err = 0, tmp;
+	uint64_t __user *scrregs = (uint64_t *)&sc->sc_scr;
+	uint32_t __user *eflags = (uint32_t *)&sc->sc_reserved;
 
-	return _restore_lsx_context(regs, fcc, fcsr);
-}
+	while (1) {
+		lock_fpu_owner();
+		if (thread_lbt_context_live()) {
+			if (is_lbt_owner()) {
+				restore_lbt_context(sc);
+			} else {
+				err |= copy_lbt_from_sigcontext(sc);
+			}
+		}
 
-static int save_hw_lasx_context(struct lasx_context __user *ctx)
-{
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
+		unlock_fpu_owner();
+		if (likely(!err))
+			break;
+		/* touch the sigcontext and try again */
+		err = __get_user(tmp, &scrregs[0]) | __get_user(tmp, eflags);
 
-	return _save_lasx_context(regs, fcc, fcsr);
-}
+		if (err)
+			return err;
+	}
 
-static int restore_hw_lasx_context(struct lasx_context __user *ctx)
-{
-	uint64_t __user *regs	= (uint64_t *)&ctx->regs;
-	uint64_t __user *fcc	= &ctx->fcc;
-	uint32_t __user *fcsr	= &ctx->fcsr;
-
-	return _restore_lasx_context(regs, fcc, fcsr);
-}
-
-#if defined(CONFIG_CPU_HAS_LBT)
-static int save_hw_lbt_context(struct lbt_context __user *ctx)
-{
-	uint64_t __user *scr	= (uint64_t *)&ctx->scr;
-	uint32_t __user *eflags	= (uint32_t *)&ctx->eflags;
-
-	return _save_scr_context(scr, eflags);
-}
-
-static int restore_hw_lbt_context(struct lbt_context __user *ctx)
-{
-	uint64_t __user *scr	= (uint64_t *)&ctx->scr;
-	uint32_t __user *eflags	= (uint32_t *)&ctx->eflags;
-
-	return _restore_scr_context(scr, eflags);
+	return err;
 }
 #endif
 
 /*
  * Helper routines
  */
-static int protected_save_fpu_context(struct extctx_layout *extctx)
+static int protected_save_fp_context(struct sigcontext __user *sc)
 {
 	int err = 0;
-	struct sctx_info __user *info = extctx->fpu.addr;
-	struct fpu_context __user *fpu_ctx = (struct fpu_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *regs	= (uint64_t *)&fpu_ctx->regs;
-	uint64_t __user *fcc	= &fpu_ctx->fcc;
-	uint32_t __user *fcsr	= &fpu_ctx->fcsr;
+	unsigned int used;
+	uint32_t __user *fcc = &sc->sc_fcsr;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint32_t __user *flags = &sc->sc_flags;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	used = used_math() ? USED_FP : 0;
+	if (!used)
+		goto fp_done;
 
 	while (1) {
 		lock_fpu_owner();
+		if (thread_lasx_context_live()) {
+			if (is_lasx_enabled()) {
+				err = save_lasx_context(sc);
+				goto finish;
+			} else {
+				err |= copy_lasx_upper_to_sigcontext(sc);
+				/* LASX contains LSX */
+				BUG_ON(!thread_lsx_context_live());
+			}
+		}
+		if (thread_lsx_context_live()) {
+			if (is_lsx_enabled()) {
+				err = save_lsx_context(sc);
+				goto finish;
+			} else {
+				err |= copy_lsx_upper_to_sigcontext(sc);
+			}
+		}
 		if (is_fpu_owner())
-			err = save_hw_fpu_context(fpu_ctx);
+			err = save_fp_context(sc);
 		else
-			err = copy_fpu_to_sigcontext(fpu_ctx);
+			err |= copy_fp_to_sigcontext(sc);
+finish:
 		unlock_fpu_owner();
-
-		err |= __put_user(FPU_CTX_MAGIC, &info->magic);
-		err |= __put_user(extctx->fpu.size, &info->size);
-
 		if (likely(!err))
 			break;
-		/* Touch the FPU context and try again */
-		err = __put_user(0, &regs[0]) |
-			__put_user(0, &regs[31]) |
+		/* touch the sigcontext and try again */
+		err = __put_user(0, &fpregs[0]) |
+			__put_user(0, &fpregs[32*4 - 1]) |
 			__put_user(0, fcc) |
 			__put_user(0, fcsr);
 		if (err)
 			return err;	/* really bad sigcontext */
 	}
 
-	return err;
+fp_done:
+	return __put_user(used, flags);
 }
 
-static int protected_restore_fpu_context(struct extctx_layout *extctx)
+static int protected_restore_fp_context(struct sigcontext __user *sc)
 {
+	unsigned int used;
 	int err = 0, sig = 0, tmp __maybe_unused;
-	struct sctx_info __user *info = extctx->fpu.addr;
-	struct fpu_context __user *fpu_ctx = (struct fpu_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *regs	= (uint64_t *)&fpu_ctx->regs;
-	uint64_t __user *fcc	= &fpu_ctx->fcc;
-	uint32_t __user *fcsr	= &fpu_ctx->fcsr;
+	uint32_t __user *fcc = &sc->sc_fcsr;
+	uint32_t __user *fcsr = &sc->sc_fcsr;
+	uint32_t __user *flags = &sc->sc_flags;
+	uint64_t __user *fpregs = (uint64_t *)&sc->sc_fpregs;
+
+	err = __get_user(used, flags);
+	conditional_used_math(used & USED_FP);
+
+	/*
+	 * The signal handler may have used FPU; give it up if the program
+	 * doesn't want it following sigreturn.
+	 */
+	if (err || !(used & USED_FP))
+		lose_fpu(0);
+
+	if (err)
+		return err;
+
+	if (!(used & USED_FP))
+		goto fp_done;
 
 	err = sig = fcsr_pending(fcsr);
 	if (err < 0)
 		return err;
 
+	err = 0;
+
 	while (1) {
 		lock_fpu_owner();
+		if (thread_lasx_context_live()) {
+			if (is_lasx_enabled()) {
+				err = restore_lasx_context(sc);
+				goto finish;
+			} else {
+				err |= copy_lasx_upper_from_sigcontext(sc);
+				/* LASX contains LSX */
+				BUG_ON(!thread_lsx_context_live());
+			}
+		}
+		if (thread_lsx_context_live()) {
+			if (is_lsx_enabled()) {
+				err = restore_lsx_context(sc);
+				goto finish;
+			} else {
+				err |= copy_lsx_upper_from_sigcontext(sc);
+				/* LSX contains FP */
+				BUG_ON(!used_math());
+			}
+		}
 		if (is_fpu_owner())
-			err = restore_hw_fpu_context(fpu_ctx);
+			err = restore_fp_context(sc);
 		else
-			err = copy_fpu_from_sigcontext(fpu_ctx);
+			err |= copy_fp_from_sigcontext(sc);
+finish:
 		unlock_fpu_owner();
-
 		if (likely(!err))
 			break;
-		/* Touch the FPU context and try again */
-		err = __get_user(tmp, &regs[0]) |
-			__get_user(tmp, &regs[31]) |
+		/* touch the sigcontext and try again */
+		err = __get_user(tmp, &fpregs[0]) |
+			__get_user(tmp, &fpregs[32*4 - 1]) |
 			__get_user(tmp, fcc) |
 			__get_user(tmp, fcsr);
 		if (err)
 			break;	/* really bad sigcontext */
 	}
 
+fp_done:
 	return err ?: sig;
 }
 
-static int protected_save_lsx_context(struct extctx_layout *extctx)
-{
-	int err = 0;
-	struct sctx_info __user *info = extctx->lsx.addr;
-	struct lsx_context __user *lsx_ctx = (struct lsx_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *regs	= (uint64_t *)&lsx_ctx->regs;
-	uint64_t __user *fcc	= &lsx_ctx->fcc;
-	uint32_t __user *fcsr	= &lsx_ctx->fcsr;
-
-	while (1) {
-		lock_fpu_owner();
-		if (is_lsx_enabled())
-			err = save_hw_lsx_context(lsx_ctx);
-		else {
-			if (is_fpu_owner())
-				save_fp(current);
-			err = copy_lsx_to_sigcontext(lsx_ctx);
-		}
-		unlock_fpu_owner();
-
-		err |= __put_user(LSX_CTX_MAGIC, &info->magic);
-		err |= __put_user(extctx->lsx.size, &info->size);
-
-		if (likely(!err))
-			break;
-		/* Touch the LSX context and try again */
-		err = __put_user(0, &regs[0]) |
-			__put_user(0, &regs[32*2-1]) |
-			__put_user(0, fcc) |
-			__put_user(0, fcsr);
-		if (err)
-			return err;	/* really bad sigcontext */
-	}
-
-	return err;
-}
-
-static int protected_restore_lsx_context(struct extctx_layout *extctx)
-{
-	int err = 0, sig = 0, tmp __maybe_unused;
-	struct sctx_info __user *info = extctx->lsx.addr;
-	struct lsx_context __user *lsx_ctx = (struct lsx_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *regs	= (uint64_t *)&lsx_ctx->regs;
-	uint64_t __user *fcc	= &lsx_ctx->fcc;
-	uint32_t __user *fcsr	= &lsx_ctx->fcsr;
-
-	err = sig = fcsr_pending(fcsr);
-	if (err < 0)
-		return err;
-
-	while (1) {
-		lock_fpu_owner();
-		if (is_lsx_enabled())
-			err = restore_hw_lsx_context(lsx_ctx);
-		else {
-			err = copy_lsx_from_sigcontext(lsx_ctx);
-			if (is_fpu_owner())
-				restore_fp(current);
-		}
-		unlock_fpu_owner();
-
-		if (likely(!err))
-			break;
-		/* Touch the LSX context and try again */
-		err = __get_user(tmp, &regs[0]) |
-			__get_user(tmp, &regs[32*2-1]) |
-			__get_user(tmp, fcc) |
-			__get_user(tmp, fcsr);
-		if (err)
-			break;	/* really bad sigcontext */
-	}
-
-	return err ?: sig;
-}
-
-static int protected_save_lasx_context(struct extctx_layout *extctx)
-{
-	int err = 0;
-	struct sctx_info __user *info = extctx->lasx.addr;
-	struct lasx_context __user *lasx_ctx =
-		(struct lasx_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *regs	= (uint64_t *)&lasx_ctx->regs;
-	uint64_t __user *fcc	= &lasx_ctx->fcc;
-	uint32_t __user *fcsr	= &lasx_ctx->fcsr;
-
-	while (1) {
-		lock_fpu_owner();
-		if (is_lasx_enabled())
-			err = save_hw_lasx_context(lasx_ctx);
-		else {
-			if (is_lsx_enabled())
-				save_lsx(current);
-			else if (is_fpu_owner())
-				save_fp(current);
-			err = copy_lasx_to_sigcontext(lasx_ctx);
-		}
-		unlock_fpu_owner();
-
-		err |= __put_user(LASX_CTX_MAGIC, &info->magic);
-		err |= __put_user(extctx->lasx.size, &info->size);
-
-		if (likely(!err))
-			break;
-		/* Touch the LASX context and try again */
-		err = __put_user(0, &regs[0]) |
-			__put_user(0, &regs[32*4-1]) |
-			__put_user(0, fcc) |
-			__put_user(0, fcsr);
-		if (err)
-			return err;	/* really bad sigcontext */
-	}
-
-	return err;
-}
-
-static int protected_restore_lasx_context(struct extctx_layout *extctx)
-{
-	int err = 0, sig = 0, tmp __maybe_unused;
-	struct sctx_info __user *info = extctx->lasx.addr;
-	struct lasx_context __user *lasx_ctx =
-		(struct lasx_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *regs	= (uint64_t *)&lasx_ctx->regs;
-	uint64_t __user *fcc	= &lasx_ctx->fcc;
-	uint32_t __user *fcsr	= &lasx_ctx->fcsr;
-
-	err = sig = fcsr_pending(fcsr);
-	if (err < 0)
-		return err;
-
-	while (1) {
-		lock_fpu_owner();
-		if (is_lasx_enabled())
-			err = restore_hw_lasx_context(lasx_ctx);
-		else {
-			err = copy_lasx_from_sigcontext(lasx_ctx);
-			if (is_lsx_enabled())
-				restore_lsx(current);
-			else if (is_fpu_owner())
-				restore_fp(current);
-		}
-		unlock_fpu_owner();
-
-		if (likely(!err))
-			break;
-		/* Touch the LASX context and try again */
-		err = __get_user(tmp, &regs[0]) |
-			__get_user(tmp, &regs[32*4-1]) |
-			__get_user(tmp, fcc) |
-			__get_user(tmp, fcsr);
-		if (err)
-			break;	/* really bad sigcontext */
-	}
-
-	return err ?: sig;
-}
-
-#if defined(CONFIG_CPU_HAS_LBT)
-static int protected_save_lbt_context(struct extctx_layout *extctx)
-{
-	int err = 0;
-	struct sctx_info __user *info = extctx->lbt.addr;
-	struct lbt_context __user *lbt_ctx = (struct lbt_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *scr	= (uint64_t *)&lbt_ctx->scr;
-	uint32_t __user *eflags	= (uint32_t *)&lbt_ctx->eflags;
-
-	while (1) {
-		lock_fpu_owner();
-		if (is_lbt_owner())
-			err = save_hw_lbt_context(lbt_ctx);
-		else
-			err = copy_lbt_to_sigcontext(lbt_ctx);
-		unlock_fpu_owner();
-
-		err |= __put_user(LBT_CTX_MAGIC, &info->magic);
-		err |= __put_user(extctx->lbt.size, &info->size);
-
-		if (likely(!err))
-			break;
-		/* Touch the LBT context and try again */
-		err = __put_user(0, &scr[0]) | __put_user(0, eflags);
-
-		if (err)
-			return err;
-	}
-
-	return err;
-}
-
-static int protected_restore_lbt_context(struct extctx_layout *extctx)
-{
-	int err = 0, tmp;
-	struct sctx_info __user *info = extctx->lbt.addr;
-	struct lbt_context __user *lbt_ctx = (struct lbt_context *)get_ctx_through_ctxinfo(info);
-	uint64_t __user *scr	= (uint64_t *)&lbt_ctx->scr;
-	uint32_t __user *eflags	= (uint32_t *)&lbt_ctx->eflags;
-
-	while (1) {
-		lock_fpu_owner();
-		if (is_lbt_owner())
-			err = restore_hw_lbt_context(lbt_ctx);
-		else
-			err = copy_lbt_from_sigcontext(lbt_ctx);
-		unlock_fpu_owner();
-
-		if (likely(!err))
-			break;
-		/* Touch the LBT context and try again */
-		err = __get_user(tmp, &scr[0]) | __get_user(tmp, eflags);
-
-		if (err)
-			return err;
-	}
-
-	return err;
-}
-#endif
-
-static int setup_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc,
-			    struct extctx_layout *extctx)
+static int setup_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
 {
 	int i, err = 0;
-	struct sctx_info __user *info;
+	unsigned int sc_flags = 0;
 
 	err |= __put_user(regs->csr_era, &sc->sc_pc);
-	err |= __put_user(extctx->flags, &sc->sc_flags);
 
 	err |= __put_user(0, &sc->sc_regs[0]);
 	for (i = 1; i < 32; i++)
 		err |= __put_user(regs->regs[i], &sc->sc_regs[i]);
 
-	if (extctx->lasx.addr)
-		err |= protected_save_lasx_context(extctx);
-	else if (extctx->lsx.addr)
-		err |= protected_save_lsx_context(extctx);
-	else if (extctx->fpu.addr)
-		err |= protected_save_fpu_context(extctx);
+	/*
+	 * Save FPU state to signal context. Signal handler
+	 * will "inherit" current FPU state.
+	 */
+	err |= protected_save_fp_context(sc);
 
 #if defined(CONFIG_CPU_HAS_LBT)
-	if (extctx->lbt.addr)
-		err |= protected_save_lbt_context(extctx);
+	err |= protected_save_lbt_context(sc);
 #endif
-	/* Set the "end" magic */
-	info = (struct sctx_info *)extctx->end.addr;
-	err |= __put_user(0, &info->magic);
-	err |= __put_user(0, &info->size);
+	if (current->thread.error_code == 1) {
+		err |= __get_user(sc_flags, &sc->sc_flags);
+		sc_flags |= ADRERR_RD;
+		err |= __put_user(sc_flags, &sc->sc_flags);
+	} else if (current->thread.error_code == 2) {
+		err |= __get_user(sc_flags, &sc->sc_flags);
+		sc_flags |= ADRERR_WR;
+		err |= __put_user(sc_flags, &sc->sc_flags);
+	}
 
 	return err;
 }
@@ -624,182 +506,26 @@ int fcsr_pending(unsigned int __user *fcsr)
 	return err ?: sig;
 }
 
-static int parse_extcontext(struct sigcontext __user *sc, struct extctx_layout *extctx)
-{
-	int err = 0;
-	unsigned int magic, size;
-	struct sctx_info __user *info = (struct sctx_info __user *)&sc->sc_extcontext;
-
-	while(1) {
-		err |= __get_user(magic, &info->magic);
-		err |= __get_user(size, &info->size);
-		if (err)
-			return err;
-
-		switch (magic) {
-		case 0: /* END */
-			goto done;
-
-		case FPU_CTX_MAGIC:
-			if (size < (sizeof(struct sctx_info) +
-				    sizeof(struct fpu_context)))
-				goto invalid;
-			extctx->fpu.addr = info;
-			break;
-
-		case LSX_CTX_MAGIC:
-			if (size < (sizeof(struct sctx_info) +
-				    sizeof(struct lsx_context)))
-				goto invalid;
-			extctx->lsx.addr = info;
-			break;
-
-		case LASX_CTX_MAGIC:
-			if (size < (sizeof(struct sctx_info) +
-				    sizeof(struct lasx_context)))
-				goto invalid;
-			extctx->lasx.addr = info;
-			break;
-
-		case LBT_CTX_MAGIC:
-			if (size < (sizeof(struct sctx_info) +
-				    sizeof(struct lbt_context)))
-				goto invalid;
-			extctx->lbt.addr = info;
-			break;
-
-		default:
-			goto invalid;
-		}
-
-		info = (struct sctx_info *)((char *)info + size);
-	}
-
-done:
-	return 0;
-
-invalid:
-	return -EINVAL;
-}
-
 static int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
 {
 	int i, err = 0;
-	struct extctx_layout extctx;
-
-	memset(&extctx, 0, sizeof(struct extctx_layout));
-
-	err = __get_user(extctx.flags, &sc->sc_flags);
-	if (err)
-		goto bad;
-
-	err = parse_extcontext(sc, &extctx);
-	if (err)
-		goto bad;
-
-	conditional_used_math(extctx.flags & SC_USED_FP);
-
-	/*
-	 * The signal handler may have used FPU; give it up if the program
-	 * doesn't want it following sigreturn.
-	 */
-	if (!(extctx.flags & SC_USED_FP))
-		lose_fpu(0);
 
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
 
 	err |= __get_user(regs->csr_era, &sc->sc_pc);
+
 	for (i = 1; i < 32; i++)
 		err |= __get_user(regs->regs[i], &sc->sc_regs[i]);
 
-	if (extctx.lasx.addr)
-		err |= protected_restore_lasx_context(&extctx);
-	else if (extctx.lsx.addr)
-		err |= protected_restore_lsx_context(&extctx);
-	else if (extctx.fpu.addr)
-		err |= protected_restore_fpu_context(&extctx);
-
 #if defined(CONFIG_CPU_HAS_LBT)
-	if (extctx.lbt.addr)
-		err |= protected_restore_lbt_context(&extctx);
+	err |= protected_restore_lbt_context(sc);
 #endif
-
-bad:
-	return err;
-}
-
-static unsigned int handle_flags(void)
-{
-	unsigned int flags = 0;
-
-	flags = used_math() ? SC_USED_FP : 0;
-
-	switch (current->thread.error_code) {
-	case 1:
-		flags |= SC_ADDRERR_RD;
-		break;
-	case 2:
-		flags |= SC_ADDRERR_WR;
-		break;
-	}
-
-	return flags;
-}
-
-static unsigned long extframe_alloc(struct extctx_layout *extctx,
-				    struct _ctx_layout *layout,
-				    size_t size, unsigned int align, unsigned long base)
-{
-	unsigned long new_base = base - size;
-
-	new_base = round_down(new_base, (align < 16 ? 16 : align));
-	new_base -= sizeof(struct sctx_info);
-
-	layout->addr = (void *)new_base;
-	layout->size = (unsigned int)(base - new_base);
-	extctx->size += layout->size;
-
-	return new_base;
-}
-
-static unsigned long setup_extcontext(struct extctx_layout *extctx, unsigned long sp)
-{
-	unsigned long new_sp = sp;
-
-	memset(extctx, 0, sizeof(struct extctx_layout));
-
-	extctx->flags = handle_flags();
-
-	/* Grow down, alloc "end" context info first. */
-	new_sp -= sizeof(struct sctx_info);
-	extctx->end.addr = (void *)new_sp;
-	extctx->end.size = (unsigned int)sizeof(struct sctx_info);
-	extctx->size += extctx->end.size;
-
-	if (extctx->flags & SC_USED_FP) {
-		if (cpu_has_lasx && thread_lasx_context_live())
-			new_sp = extframe_alloc(extctx, &extctx->lasx,
-			  sizeof(struct lasx_context), LASX_CTX_ALIGN, new_sp);
-		else if (cpu_has_lsx && thread_lsx_context_live())
-			new_sp = extframe_alloc(extctx, &extctx->lsx,
-			  sizeof(struct lsx_context), LSX_CTX_ALIGN, new_sp);
-		else if (cpu_has_fpu)
-			new_sp = extframe_alloc(extctx, &extctx->fpu,
-			  sizeof(struct fpu_context), FPU_CTX_ALIGN, new_sp);
-	}
-
-#if defined(CONFIG_CPU_HAS_LBT)
-	if (cpu_has_lbt && thread_lbt_context_live())
-		new_sp = extframe_alloc(extctx, &extctx->lbt,
-			  sizeof(struct lbt_context), LBT_CTX_ALIGN, new_sp);
-#endif
-
-	return new_sp;
+	return err ?: protected_restore_fp_context(sc);
 }
 
 void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
-			  struct extctx_layout *extctx)
+			  size_t frame_size)
 {
 	unsigned long sp;
 
@@ -810,19 +536,12 @@ void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 	 * If we are on the alternate signal stack and would overflow it, don't.
 	 * Return an always-bogus address instead so we will die with SIGSEGV.
 	 */
-	if (on_sig_stack(sp) &&
-	    !likely(on_sig_stack(sp - sizeof(struct rt_sigframe))))
+	if (on_sig_stack(sp) && !likely(on_sig_stack(sp - frame_size)))
 		return (void __user __force *)(-1UL);
 
 	sp = sigsp(sp, ksig);
-	sp = round_down(sp, 16);
-	sp = setup_extcontext(extctx, sp);
-	sp -= sizeof(struct rt_sigframe);
 
-	if (!IS_ALIGNED(sp, 16))
-		BUG();
-
-	return (void __user *)sp;
+	return (void __user *)((sp - frame_size) & STACK_ALIGN);
 }
 
 /*
@@ -866,11 +585,10 @@ static int setup_rt_frame(void *sig_return, struct ksignal *ksig,
 			  struct pt_regs *regs, sigset_t *set)
 {
 	int err = 0;
-	struct extctx_layout extctx;
 	struct rt_sigframe __user *frame;
 
-	frame = get_sigframe(ksig, regs, &extctx);
-	if (!access_ok(frame, sizeof(*frame) + extctx.size))
+	frame = get_sigframe(ksig, regs, sizeof(*frame));
+	if (!access_ok(frame, sizeof (*frame)))
 		return -EFAULT;
 
 	/* Create siginfo.  */
@@ -880,7 +598,7 @@ static int setup_rt_frame(void *sig_return, struct ksignal *ksig,
 	err |= __put_user(0, &frame->rs_uctx.uc_flags);
 	err |= __put_user(NULL, &frame->rs_uctx.uc_link);
 	err |= __save_altstack(&frame->rs_uctx.uc_stack, regs->regs[3]);
-	err |= setup_sigcontext(regs, &frame->rs_uctx.uc_mcontext, &extctx);
+	err |= setup_sigcontext(regs, &frame->rs_uctx.uc_mcontext);
 	err |= __copy_to_user(&frame->rs_uctx.uc_sigmask, set, sizeof(*set));
 
 	if (err)
@@ -983,3 +701,18 @@ void arch_do_signal_or_restart(struct pt_regs *regs, bool has_signal)
 	 */
 	restore_saved_sigmask();
 }
+
+static int signal_setup(void)
+{
+	if (cpu_has_fpu) {
+		save_fp_context = save_hw_fp_context;
+		restore_fp_context = restore_hw_fp_context;
+	} else {
+		save_fp_context = copy_fp_to_sigcontext;
+		restore_fp_context = copy_fp_from_sigcontext;
+	}
+
+	return 0;
+}
+
+arch_initcall(signal_setup);
