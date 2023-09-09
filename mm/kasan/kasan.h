@@ -199,7 +199,7 @@ struct kasan_free_meta *kasan_get_free_meta(struct kmem_cache *cache,
 
 #if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
 
-#ifndef __HAVE_ARCH_SHADOW_MAP
+#ifndef kasan_shadow_to_mem
 static inline const void *kasan_shadow_to_mem(const void *shadow_addr)
 {
 	return (void *)(((unsigned long)shadow_addr - KASAN_SHADOW_OFFSET)
@@ -207,14 +207,12 @@ static inline const void *kasan_shadow_to_mem(const void *shadow_addr)
 }
 #endif
 
+#ifndef addr_has_metadata
 static inline bool addr_has_metadata(const void *addr)
 {
-#ifdef __HAVE_ARCH_SHADOW_MAP
-	return (kasan_mem_to_shadow((void *)addr) != NULL);
-#else
 	return (addr >= kasan_shadow_to_mem((void *)KASAN_SHADOW_START));
-#endif
 }
+#endif
 
 /**
  * kasan_check_range - Check memory region, and report if invalid access.
