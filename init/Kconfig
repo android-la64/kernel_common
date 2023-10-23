@@ -1248,7 +1248,7 @@ config SCHED_AUTOGROUP
 
 config RT_SOFTINT_OPTIMIZATION
        bool "Improve RT scheduling during long softint execution"
-       depends on ARM64
+       depends on (ARM64 || LOONGARCH)
        depends on SMP
        default n
        help
