@@ -378,7 +378,9 @@ void __noreturn arch_cpu_idle_dead(void)
 		  [count] "=&r" (count), [init_fn] "=&r" (addr)
 		: /* No Input */
 		: "a1");
-	init_fn = __va(addr);
+
+	local_irq_disable();
+	init_fn = cpu_has_csripi ? __va(iocsr_read64(LOONGARCH_IOCSR_MBUF0)) : __va(addr);
 
 	init_fn();
 	unreachable();
