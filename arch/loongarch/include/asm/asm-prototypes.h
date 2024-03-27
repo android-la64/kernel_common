@@ -5,3 +5,9 @@
 #include <linux/uaccess.h>
 #include <asm/ftrace.h>
 #include <asm/mmu_context.h>
+
+#ifdef CONFIG_ARCH_SUPPORTS_INT128
+__int128_t __ashlti3(__int128_t a, int b);
+__int128_t __ashrti3(__int128_t a, int b);
+__int128_t __lshrti3(__int128_t a, int b);
+#endif
