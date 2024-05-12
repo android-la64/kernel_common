@@ -6,6 +6,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/irq_work.h>
 #include <linux/profile.h>
 #include <linux/smp.h>
 #include <linux/spinlock.h>
@@ -147,6 +148,13 @@ void smp_send_reschedule(int cpu)
 	mp_ops->send_ipi_single(cpu, SMP_RESCHEDULE);
 }
 EXPORT_SYMBOL_GPL(smp_send_reschedule);
+
+#ifdef CONFIG_IRQ_WORK
+void arch_irq_work_raise(void)
+{
+	mp_ops->send_ipi_single(smp_processor_id(), SMP_IRQ_WORK);
+}
+#endif
 
 /*
  * First C code run on the secondary CPUs after being started up by

@@ -6,6 +6,7 @@
 
 #include <linux/acpi.h>
 #include <linux/init.h>
+#include <linux/irq_work.h>
 #include <linux/cpu.h>
 #include <linux/sched.h>
 #include <linux/sched/hotplug.h>
@@ -49,11 +50,13 @@ static void (*ipi_write_action)(int cpu, u32 action);
 enum ipi_msg_type {
 	IPI_RESCHEDULE,
 	IPI_CALL_FUNCTION,
+	IPI_IRQ_WORK,
 };
 
 static const char *ipi_types[NR_IPI] __tracepoint_string = {
 	[IPI_RESCHEDULE] = "Rescheduling interrupts",
 	[IPI_CALL_FUNCTION] = "Function call interrupts",
+	[IPI_IRQ_WORK] = "IRQ work interrupts",
 };
 
 void show_ipi_list(struct seq_file *p, int prec)
@@ -195,6 +198,11 @@ irqreturn_t loongson3_ipi_interrupt(int irq, void *dev)
 	if (action & SMP_CALL_FUNCTION) {
 		generic_smp_call_function_interrupt();
 		per_cpu(irq_stat, cpu).ipi_irqs[IPI_CALL_FUNCTION]++;
+	}
+
+	if (action & SMP_IRQ_WORK) {
+		irq_work_run();
+		per_cpu(irq_stat, cpu).ipi_irqs[IPI_IRQ_WORK]++;
 	}
 
 	return IRQ_HANDLED;
