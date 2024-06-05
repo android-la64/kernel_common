@@ -116,6 +116,18 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON,
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON,
 			PCI_DEVICE_ID_LOONGSON_GNET, loongson_pci_pin_quirk);
 
+static void loongson_pci_msi_quirk(struct pci_dev *dev)
+{
+	u16 val, class = dev->class >> 8;
+
+	if (class == PCI_CLASS_BRIDGE_HOST) {
+		pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &val);
+		val |= PCI_MSI_FLAGS_ENABLE;
+		pci_write_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, val);
+	}
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON, DEV_LS7A_PCIE_PORT5, loongson_pci_msi_quirk);
+
 static void __iomem *cfg1_map(struct loongson_pci *priv, int bus,
 				unsigned int devfn, int where)
 {
