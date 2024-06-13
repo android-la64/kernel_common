@@ -65,6 +65,8 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	/* Config Direct Mapping */
 	csr_write64(CSR_DMW0_INIT, LOONGARCH_CSR_DMWIN0);
 	csr_write64(CSR_DMW1_INIT, LOONGARCH_CSR_DMWIN1);
+	csr_write64(CSR_DMW2_INIT, LOONGARCH_CSR_DMWIN2);
+	csr_write64(CSR_DMW3_INIT, LOONGARCH_CSR_DMWIN3);
 
 	decompress_kernel((unsigned long)efi_heap, 0);
 	kernel_entry = (kernel_entry_t)kernel_entaddr;
