@@ -31,6 +31,7 @@
 #include <linux/vmalloc.h>
 #include <asm/dma.h>
 #include <linux/aer.h>
+#include <linux/suspend.h>
 #ifndef  __GENKSYMS__
 #include <trace/hooks/pci.h>
 #endif
@@ -5781,7 +5782,7 @@ int pcie_set_readrq(struct pci_dev *dev, int rq)
 
 	v = (ffs(rq) - 8) << 12;
 
-	if (bridge->no_inc_mrrs) {
+	if (bridge->no_inc_mrrs && (pm_suspend_target_state == PM_SUSPEND_ON)) {
 		int max_mrrs = pcie_get_readrq(dev);
 
 		if (rq > max_mrrs) {
