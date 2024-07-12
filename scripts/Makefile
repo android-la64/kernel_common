@@ -4,7 +4,7 @@
 # the kernel for the build process.
 
 CRYPTO_LIBS = $(shell pkg-config --libs libcrypto 2> /dev/null || echo -lcrypto)
-CRYPTO_CFLAGS = $(shell pkg-config --cflags libcrypto 2> /dev/null)
+CRYPTO_CFLAGS = $(shell pkg-config --cflags libcrypto 2> /dev/null) -I$(srctree)/scripts
 
 hostprogs-always-$(CONFIG_BUILD_BIN2C)			+= bin2c
 hostprogs-always-$(CONFIG_KALLSYMS)			+= kallsyms
