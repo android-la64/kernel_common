@@ -21,8 +21,9 @@
 #define GPR_BASE	0
 #define GPR_NUM		32
 #define GPR_END		(GPR_BASE + GPR_NUM - 1)
-#define PC		(GPR_END + 1)
-#define BADVADDR	(GPR_END + 2)
+#define ARG0		(GPR_END + 1)
+#define PC		(GPR_END + 2)
+#define BADVADDR	(GPR_END + 3)
 
 #define NUM_FPU_REGS	32
 
@@ -30,10 +31,13 @@ struct user_pt_regs {
 	/* Main processor registers. */
 	unsigned long regs[32];
 
+	/* Original syscall arg0. */
+	unsigned long orig_a0;
+
 	/* Special CSR registers. */
 	unsigned long csr_era;
 	unsigned long csr_badv;
-	unsigned long reserved[11];
+	unsigned long reserved[10];
 } __attribute__((aligned(8)));
 
 struct user_fp_state {
