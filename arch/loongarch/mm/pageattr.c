@@ -155,3 +155,79 @@ int set_memory_rw(unsigned long addr, int numpages)
 
 	return __set_memory(addr, numpages, __pgprot(_PAGE_WRITE | _PAGE_DIRTY), __pgprot(0));
 }
+
+bool kernel_page_present(struct page *page)
+{
+	pgd_t *pgd;
+	p4d_t *p4d;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	unsigned long addr = (unsigned long)page_address(page);
+
+	if (addr < vm_map_base)
+		return true;
+
+	pgd = pgd_offset_k(addr);
+	if (pgd_none(*pgd))
+		return false;
+	if (pgd_leaf(*pgd))
+		return true;
+
+	p4d = p4d_offset(pgd, addr);
+	if (p4d_none(*p4d))
+		return false;
+	if (p4d_leaf(*p4d))
+		return true;
+
+	pud = pud_offset(p4d, addr);
+	if (pud_none(*pud))
+		return false;
+	if (pud_leaf(*pud))
+		return true;
+
+	pmd = pmd_offset(pud, addr);
+	if (pmd_none(*pmd))
+		return false;
+	if (pmd_leaf(*pmd))
+		return true;
+
+	pte = pte_offset_kernel(pmd, addr);
+	return pte_present(*pte);
+}
+
+int set_direct_map_default_noflush(struct page *page)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+
+	if (addr < vm_map_base)
+		return 0;
+
+	return __set_memory(addr, 1, PAGE_KERNEL, __pgprot(0));
+}
+
+int set_direct_map_invalid_noflush(struct page *page)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+
+	if (addr < vm_map_base)
+		return 0;
+
+	return __set_memory(addr, 1, __pgprot(0), __pgprot(_PAGE_PRESENT | _PAGE_VALID));
+}
+
+void __kernel_map_pages(struct page *page, int numpages, int enable)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+
+	if (addr < vm_map_base)
+		return;
+
+	if (!debug_pagealloc_enabled())
+		return;
+
+	if (enable)
+		__set_memory(addr, numpages, __pgprot(_PAGE_PRESENT), __pgprot(0));
+	else
+		__set_memory(addr, numpages, __pgprot(0), __pgprot(_PAGE_PRESENT));
+}
