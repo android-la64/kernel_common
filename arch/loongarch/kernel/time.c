@@ -132,7 +132,11 @@ int constant_clockevent_init(void)
 {
 	int irq;
 	unsigned int cpu = smp_processor_id();
-	unsigned long min_delta = 0x600;
+#ifdef CONFIG_PREEMPT_RT
+	unsigned long min_delta = 100;
+#else
+	unsigned long min_delta = 1000;
+#endif
 	unsigned long max_delta = (1UL << 48) - 1;
 	struct clock_event_device *cd;
 	static int timer_irq_installed = 0;
