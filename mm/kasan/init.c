@@ -126,8 +126,12 @@ static int __ref zero_pmd_populate(pud_t *pud, unsigned long addr,
 
 			if (slab_is_available())
 				p = pte_alloc_one_kernel(&init_mm);
-			else
+			else {
 				p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
+#ifdef CONFIG_LOONGARCH
+				kernel_pte_init((unsigned long)p);
+#endif
+			}
 			if (!p)
 				return -ENOMEM;
 

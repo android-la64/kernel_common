@@ -201,6 +201,7 @@ pmd_t * __meminit arch_vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int 
 		void *p = arch_vmemmap_alloc_block_zero(PAGE_SIZE, node);
 		if (!p)
 			return NULL;
+		kernel_pte_init((unsigned long)p);
 		pmd_populate_kernel(&init_mm, pmd, p);
 	}
 	return pmd;
@@ -374,7 +375,9 @@ pte_t * __init populate_kernel_pte(unsigned long addr)
 		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
 		if (!pte)
 			panic("%s: Failed to allocate memory\n", __func__);
+
 		pmd_populate_kernel(&init_mm, pmd, pte);
+		kernel_pte_init((unsigned long)pte);
 	}
 
 	return pte_offset_kernel(pmd, addr);
