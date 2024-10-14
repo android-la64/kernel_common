@@ -239,6 +239,7 @@ extern void set_pmd_at(struct mm_struct *mm, unsigned long addr, pmd_t *pmdp, pm
 extern void pgd_init(unsigned long page);
 extern void pud_init(unsigned long page, unsigned long pagetable);
 extern void pmd_init(unsigned long page, unsigned long pagetable);
+extern void kernel_pte_init(unsigned long page);
 
 /*
  * Non-present pages:  high 40 bits are offset, next 8 bits type,
