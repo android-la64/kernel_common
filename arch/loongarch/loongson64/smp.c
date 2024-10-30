@@ -232,6 +232,7 @@ static void loongson3_init_secondary(void)
 		     cpu_logical_map(cpu) / loongson_sysconf.cores_per_package;
 	cpu_data[cpu].core = pptt_enabled ? cpu_data[cpu].core :
 		     cpu_logical_map(cpu) % loongson_sysconf.cores_per_package;
+	cpu_data[cpu].global_id = cpu_logical_map(cpu);
 }
 
 static void loongson3_smp_finish(void)
@@ -269,10 +270,10 @@ static void __init loongson3_prepare_cpus(unsigned int max_cpus)
 	int i = 0;
 
 	parse_acpi_topology();
+	cpu_data[0].global_id = cpu_logical_map(0);
 
 	for (i = 0; i < loongson_sysconf.nr_cpus; i++) {
 		set_cpu_present(i, true);
-		cpu_data[i].global_id = __cpu_logical_map[i];
 
 		if (cpu_has_csripi)
 			csr_mail_send(0, __cpu_logical_map[i], 0);
