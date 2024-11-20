@@ -31,7 +31,7 @@ cflags-y += $(call cc-option, -mno-check-zero-division)
 
 ifdef CONFIG_64BIT
 ld-emul			= $(64bit-emul)
-cflags-y		+= -mabi=lp64s
+cflags-y		+= -mabi=lp64s -mcmodel=normal
 endif
 
 all-y			:= vmlinux
