@@ -55,7 +55,7 @@ static void __init init_screen_info(void)
 	early_memunmap(si, sizeof(*si));
 
 	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI)
-		memblock_reserve(screen_info.lfb_base, screen_info.lfb_size);
+		memblock_reserve((((u64)screen_info.ext_lfb_base << 32) + screen_info.lfb_base), screen_info.lfb_size);
 }
 
 void __init efi_runtime_init(void)
