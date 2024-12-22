@@ -11,7 +11,7 @@
 
 void enable_gpe_wakeup(void)
 {
-	acpi_enable_all_wakeup_gpes();
+	acpi_hw_enable_all_wakeup_gpes();
 }
 
 void enable_pci_wakeup(void)
