@@ -270,7 +270,7 @@ config 64BIT
 endchoice
 
 config FIX_EARLYCON_MEM
-	def_bool y
+	def_bool !ARCH_IOREMAP
 
 config PAGE_SIZE_4KB
 	bool
