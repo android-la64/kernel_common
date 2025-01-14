@@ -34,9 +34,6 @@
 	st.d		$r29, sp, PT_R29
 	st.d		$r30, sp, PT_R30
 	st.d		$r31, sp, PT_R31
-
-	la.pcrel	t0, acpi_saved_sp
-	st.d		sp, t0, 0
 .endm
 
 .macro SETUP_WAKEUP
@@ -55,6 +52,7 @@
 	ld.d		$r29, sp, PT_R29
 	ld.d		$r30, sp, PT_R30
 	ld.d		$r31, sp, PT_R31
+	addi.d		sp, sp, PT_SIZE
 .endm
 
 	.text
@@ -63,6 +61,10 @@
 /* Sleep/wakeup code for Loongson-3 */
 SYM_FUNC_START(loongarch_suspend_enter)
 	SETUP_SLEEP
+
+	la.pcrel	t0, acpi_saved_sp
+	st.d		sp, t0, 0
+
 	bl		__flush_cache_all
 
 	/* Pass RA and SP to BIOS */
@@ -86,7 +88,7 @@ SYM_INNER_LABEL(loongarch_wakeup_start, SYM_L_GLOBAL)
 
 	la.pcrel	t0, acpi_saved_sp
 	ld.d		sp, t0, 0
+
 	SETUP_WAKEUP
-	addi.d		sp, sp, PT_SIZE
 	jr		ra
 SYM_FUNC_END(loongarch_suspend_enter)
