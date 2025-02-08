@@ -89,6 +89,8 @@ extern int __cpu_logical_map[NR_CPUS];
 #define SMP_CALL_FUNCTION	0x4
 #define SMP_IRQ_WORK		0x8
 
+struct seq_file;
+
 struct secondary_data {
 	unsigned long stack;
 	unsigned long thread_info;
