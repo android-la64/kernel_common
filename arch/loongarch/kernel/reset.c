@@ -24,8 +24,7 @@ static void machine_hang(void)
 	console_flush_on_panic(CONSOLE_FLUSH_PENDING);
 
 	while (true) {
-		__arch_cpu_idle();
-		local_irq_disable();
+		__asm__ __volatile__("idle 0" : : : "memory");
 	}
 }
 
