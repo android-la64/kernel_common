@@ -68,6 +68,7 @@ config LOONGARCH
 	select BUILDTIME_TABLE_SORT
 	select COMMON_CLK
 	select CPU_PM
+	select CPU_FREQ
 	select EFI
 	select GENERIC_CLOCKEVENTS
 	select GENERIC_CMOS_UPDATE
