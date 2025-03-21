@@ -8,6 +8,7 @@
 #include <linux/ptrace.h>		/* for linux pt_regs struct */
 #include <linux/kgdb.h>
 #include <linux/kdebug.h>
+#include <linux/objtool.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <asm/inst.h>
@@ -239,15 +240,13 @@ out:
 
 }
 
-void arch_kgdb_breakpoint(void)
+noinline void arch_kgdb_breakpoint(void)
 {
 	__asm__ __volatile__(
 		".globl breakinst\n\t"
-		"nop\n"
 		"breakinst:\tbreak 0\n\t");
-
-	annotate_reachable();
 }
+STACK_FRAME_NON_STANDARD(arch_kgdb_breakpoint);
 
 static int compute_signal(int tt)
 {
