@@ -4,7 +4,7 @@
 
 #include <linux/irqreturn.h>
 
-#define MAX_IO_PICS 2
+#define MAX_IO_PICS 8
 #define NR_IRQS	(64 + (256 * MAX_IO_PICS))
 
 #define CORES_PER_EIO_NODE	4
