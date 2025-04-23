@@ -146,7 +146,6 @@ config MACH_LOONGSON64
 	select HAVE_PCI
 	select PCI
 	select IRQ_LOONGARCH_CPU
-	select NR_CPUS_DEFAULT_64
 	select SPARSE_IRQ
 	select SYS_HAS_CPU_LOONGSON64
 	select SYS_SUPPORTS_SMP
@@ -635,30 +634,11 @@ config HOTPLUG_CPU
 config SYS_SUPPORTS_SMP
 	bool
 
-config NR_CPUS_DEFAULT_4
-	bool
-
-config NR_CPUS_DEFAULT_8
-	bool
-
-config NR_CPUS_DEFAULT_16
-	bool
-
-config NR_CPUS_DEFAULT_32
-	bool
-
-config NR_CPUS_DEFAULT_64
-	bool
-
 config NR_CPUS
-	int "Maximum number of CPUs (2-256)"
-	range 2 256
+	int "Maximum number of CPUs (2-2048)"
+	range 2 2048
+	default "2048"
 	depends on SMP
-	default "4" if NR_CPUS_DEFAULT_4
-	default "8" if NR_CPUS_DEFAULT_8
-	default "16" if NR_CPUS_DEFAULT_16
-	default "32" if NR_CPUS_DEFAULT_32
-	default "64" if NR_CPUS_DEFAULT_64
 	help
 	  This allows you to specify the maximum number of CPUs which this
 	  kernel will support.  The maximum supported value is 32 for 32-bit

@@ -446,8 +446,8 @@ __asm__(".macro	parse_r var r\n\t"
 
 /* Config CSR registers */
 #define LOONGARCH_CSR_CPUID		0x20	/* CPU core id */
-#define  CSR_CPUID_COREID_WIDTH		9
-#define  CSR_CPUID_COREID		_ULCAST_(0x1ff)
+#define  CSR_CPUID_COREID_WIDTH		11
+#define  CSR_CPUID_COREID		_ULCAST_(0x7ff)
 
 #define LOONGARCH_CSR_PRCFG1		0x21	/* Config1 */
 #define  CSR_CONF1_VSMAX_SHIFT		12
