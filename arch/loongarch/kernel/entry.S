@@ -64,6 +64,7 @@ SYM_CODE_START(handle_syscall)
 	move	a0, sp
 	bl	do_syscall
 
+	STACKLEAK_ERASE
 	RESTORE_ALL_AND_RET
 SYM_CODE_END(handle_syscall)
 
@@ -71,6 +72,7 @@ SYM_CODE_START(ret_from_fork)
 	bl	schedule_tail		# a0 = struct task_struct *prev
 	move	a0, sp
 	bl 	syscall_exit_to_user_mode
+	STACKLEAK_ERASE
 	RESTORE_STATIC
 	RESTORE_SOME
 	RESTORE_SP_AND_RET
@@ -82,6 +84,7 @@ SYM_CODE_START(ret_from_kernel_thread)
 	jirl	ra, s0, 0
 	move	a0, sp
 	bl	syscall_exit_to_user_mode
+	STACKLEAK_ERASE
 	RESTORE_STATIC
 	RESTORE_SOME
 	RESTORE_SP_AND_RET

@@ -56,6 +56,12 @@
 	jirl	zero, \temp1, 0xc
 	.endm
 
+	.macro STACKLEAK_ERASE
+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+	bl	stackleak_erase
+#endif
+	.endm
+
 	.macro BACKUP_T0T1
 	csrwr	t0, EXCEPTION_KS0
 	csrwr	t1, EXCEPTION_KS1
