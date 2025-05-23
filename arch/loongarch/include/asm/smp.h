@@ -34,7 +34,7 @@ struct plat_smp_ops {
 extern const struct plat_smp_ops *mp_ops;
 void register_smp_ops(const struct plat_smp_ops *ops);
 
-static inline void plat_smp_setup(void)
+static inline void __init plat_smp_setup(void)
 {
 	mp_ops->smp_setup();
 }
@@ -43,7 +43,7 @@ static inline void plat_smp_setup(void)
 
 struct plat_smp_ops;
 
-static inline void plat_smp_setup(void)
+static inline void __init plat_smp_setup(void)
 {
 	/* UP, nothing to do ...  */
 }
