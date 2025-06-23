@@ -27,6 +27,9 @@ static inline void hypervisor_pin_vcpu(int cpu)
 
 static inline bool jailhouse_paravirt(void)
 {
+	if (IS_ENABLED(CONFIG_LOONGARCH))
+		return true;
+
 	return of_find_compatible_node(NULL, NULL, "jailhouse,cell");
 }
 
