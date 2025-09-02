@@ -60,7 +60,7 @@ arch_initcall(init_cpu_fullname);
 static ssize_t boardinfo_show(struct kobject *kobj,
 			      struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf,
+	return sysfs_emit(buf,
 		"BIOS Information\n"
 		"Vendor\t\t\t: %s\n"
 		"Version\t\t\t: %s\n"
