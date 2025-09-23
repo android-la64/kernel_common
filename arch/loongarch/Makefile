@@ -27,7 +27,7 @@ ifneq ($(SUBARCH),$(ARCH))
   endif
 endif
 
-cflags-y += $(call cc-option, -mno-check-zero-division)
+cflags-y += $(call cc-option, -mno-check-zero-division -fno-isolate-erroneous-paths-dereference)
 
 ifdef CONFIG_64BIT
 ld-emul			= $(64bit-emul)
