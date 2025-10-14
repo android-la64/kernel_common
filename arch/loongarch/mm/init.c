@@ -61,7 +61,6 @@ int __ref page_is_ram(unsigned long pfn)
 	return memblock_is_memory(addr) && !memblock_is_reserved(addr);
 }
 
-#ifndef CONFIG_NEED_MULTIPLE_NODES
 void __init paging_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES];
@@ -76,13 +75,14 @@ void __init paging_init(void)
 
 void __init mem_init(void)
 {
+#ifndef CONFIG_NEED_MULTIPLE_NODES
 	max_mapnr = max_low_pfn;
+#endif
 	high_memory = (void *) __va(max_low_pfn << PAGE_SHIFT);
 
 	memblock_free_all();
 	mem_init_print_info(NULL);
 }
-#endif /* !CONFIG_NEED_MULTIPLE_NODES */
 
 void __ref free_initmem(void)
 {
