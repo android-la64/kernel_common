@@ -2828,7 +2828,7 @@ static unsigned int pci_scan_child_bus_extend(struct pci_bus *bus,
 		 * multi-function device to a guest without passing function 0.
 		 * Look for them as well.
 		 */
-		if (jailhouse_paravirt() && nr_devs == 0) {
+		if (jailhouse_paravirt(bus->number) && nr_devs == 0) {
 			for (fn = 1; fn < 8; fn++) {
 				dev = pci_scan_single_device(bus, devfn + fn);
 				if (dev)

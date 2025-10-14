@@ -25,10 +25,12 @@ static inline void hypervisor_pin_vcpu(int cpu)
 {
 }
 
-static inline bool jailhouse_paravirt(void)
+static inline bool jailhouse_paravirt(int bus)
 {
-	if (IS_ENABLED(CONFIG_LOONGARCH))
-		return true;
+	if (IS_ENABLED(CONFIG_LOONGARCH)) {
+		if (bus == 0)
+			return true;
+	}
 
 	return of_find_compatible_node(NULL, NULL, "jailhouse,cell");
 }
