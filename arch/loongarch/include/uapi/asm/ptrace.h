@@ -10,10 +10,6 @@
 
 #include <linux/types.h>
 
-#ifndef __KERNEL__
-#include <stdint.h>
-#endif
-
 /*
  * For PTRACE_{POKE,PEEK}USR. 0 - 31 are GPRs,
  * 32 is syscall's original ARG0, 33 is PC, 34 is BADVADDR.
@@ -41,19 +37,19 @@ struct user_pt_regs {
 } __attribute__((aligned(8)));
 
 struct user_fp_state {
-	uint64_t fpr[32];
-	uint64_t fcc;
-	uint32_t fcsr;
+	__u64 fpr[32];
+	__u64 fcc;
+	__u32 fcsr;
 };
 
 struct user_lsx_state {
 	/* 32 registers, 128 bits width per register. */
-	uint64_t vregs[32*2];
+	__u64 vregs[32*2];
 };
 
 struct user_lasx_state {
 	/* 32 registers, 256 bits width per register. */
-	uint64_t vregs[32*4];
+	__u64 vregs[32*4];
 };
 
 /* Read and write watchpoint registers.	 */
@@ -65,34 +61,34 @@ enum pt_watch_style {
 };
 
 struct la32_watch_regs {
-	uint32_t addr;
-	uint32_t mask;
+	__u32 addr;
+	__u32 mask;
 	/* irw/irwsta/irwmask I R W bits.
 	 * bit 0 -- 1 if W bit is usable.
 	 * bit 1 -- 1 if R bit is usable.
 	 * bit 2 -- 1 if I bit is usable.
 	 */
-	uint8_t irw;
-	uint8_t irwstat;
-	uint8_t irwmask;
+	__u8 irw;
+	__u8 irwstat;
+	__u8 irwmask;
 } __attribute__((aligned(8)));
 
 struct la64_watch_regs {
-	uint64_t addr;
-	uint64_t mask;
+	__u64 addr;
+	__u64 mask;
 	/* irw/irwsta/irwmask I R W bits.
 	 * bit 0 -- 1 if W bit is usable.
 	 * bit 1 -- 1 if R bit is usable.
 	 * bit 2 -- 1 if I bit is usable.
 	 */
-	uint8_t irw;
-	uint8_t irwstat;
-	uint8_t irwmask;
+	__u8 irw;
+	__u8 irwstat;
+	__u8 irwmask;
 } __attribute__((aligned(8)));
 
 struct pt_watch_regs {
-	int16_t max_valid;
-	int16_t num_valid;
+	__s16 max_valid;
+	__s16 num_valid;
 	enum pt_watch_style style;
 	union {
 		struct la32_watch_regs la32[NUM_WATCH_REGS];
