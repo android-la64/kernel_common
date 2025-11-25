@@ -195,7 +195,7 @@ static inline void __init *determine_relocation_address(void)
 	if (kaslr_disabled())
 		return dest;
 
-	kernel_length = (long)_end - (long)(&_text);
+	kernel_length = (unsigned long)_end - (unsigned long)(&_text);
 
 	offset = get_random_boot() << 16;
 	offset &= (CONFIG_RANDOMIZE_BASE_MAX_OFFSET - 1);
