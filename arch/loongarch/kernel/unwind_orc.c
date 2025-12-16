@@ -319,12 +319,6 @@ static inline unsigned long bt_address(unsigned long ra)
 {
 	extern unsigned long eentry;
 
-	if (__kernel_text_address(ra))
-		return ra;
-
-	if (__module_text_address(ra))
-		return ra;
-
 	if (ra >= eentry && ra <= eentry + EXCCODE_INT_END * VECSIZE) {
 		unsigned long type = (ra - eentry) / VECSIZE;
 		unsigned long offset = (ra - eentry) % VECSIZE;
@@ -341,10 +335,13 @@ static inline unsigned long bt_address(unsigned long ra)
 			return 0;
 		}
 
-		return func + offset;
+		ra = func + offset;
 	}
 
-	return ra;
+	if (__kernel_text_address(ra))
+		return ra;
+
+	return 0;
 }
 
 static inline bool on_stack(struct stack_info *info, unsigned long addr,
