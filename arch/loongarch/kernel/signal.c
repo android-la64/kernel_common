@@ -28,16 +28,12 @@
 #include <asm/cacheflush.h>
 #include <asm/cpu-features.h>
 #include <asm/fpu.h>
+#include <asm/sigframe.h>
 #include <asm/ucontext.h>
 #include <asm/inst.h>
 #include <asm/vdso.h>
 
 #include "signal-common.h"
-
-struct rt_sigframe {
-	struct siginfo rs_info;
-	struct ucontext rs_uctx;
-};
 
 static void __user *get_ctx_through_ctxinfo(struct sctx_info *info)
 {
