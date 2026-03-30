@@ -79,9 +79,9 @@ BUILD_FPR_ACCESS(32)
 BUILD_FPR_ACCESS(64)
 
 struct loongarch_fpu {
+	union fpureg	fpr[NUM_FPU_REGS];
 	unsigned int	fcsr;
 	uint64_t	fcc;	/* 8x8 */
-	union fpureg	fpr[NUM_FPU_REGS];
 };
 
 #define INIT_CPUMASK { \

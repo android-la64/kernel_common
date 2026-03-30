@@ -106,6 +106,8 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 
 	preempt_enable();
 
+	dst->thread.fpu.fcsr =  src->thread.fpu.fcsr;
+
 	if (used_math())
 		memcpy(dst, src, sizeof(struct task_struct));
 	else
