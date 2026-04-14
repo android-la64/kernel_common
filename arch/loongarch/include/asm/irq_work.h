@@ -4,7 +4,7 @@
 
 static inline bool arch_irq_work_has_interrupt(void)
 {
-	return IS_ENABLED(CONFIG_SMP);
+	return IS_ENABLED(CONFIG_SMP) && cpu_opt(LOONGARCH_CPU_CSRIPI);
 }
 extern void arch_irq_work_raise(void);
 
