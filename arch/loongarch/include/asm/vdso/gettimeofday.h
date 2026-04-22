@@ -88,12 +88,6 @@ static __always_inline u64 __arch_get_hw_counter(s32 clock_mode,
 	return count;
 }
 
-static inline bool loongarch_vdso_hres_capable(void)
-{
-	return true;
-}
-#define __arch_vdso_hres_capable loongarch_vdso_hres_capable
-
 static __always_inline const struct vdso_data *__arch_get_vdso_data(void)
 {
 	return (const struct vdso_data *)get_vdso_data();
