@@ -256,6 +256,7 @@ struct hda_codec {
 	unsigned int relaxed_resume:1;	/* don't resume forcibly for jack */
 	unsigned int forced_resume:1; /* forced resume for jack */
 	unsigned int mst_no_extra_pcms:1; /* no backup PCMs for DP-MST */
+	unsigned int eld_jack_detect:1;	/* Machine jack-detection by ELD */
 
 #ifdef CONFIG_PM
 	unsigned long power_on_acct;

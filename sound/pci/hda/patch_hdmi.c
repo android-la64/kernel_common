@@ -4310,11 +4310,25 @@ static int patch_gf_hdmi(struct hda_codec *codec)
 	return 0;
 }
 
+static int patch_loongson_hdmi(struct hda_codec *codec)
+{
+	int err;
+
+	err = patch_generic_hdmi(codec);
+	if (err)
+		return err;
+
+	if (codec->bus && codec->bus->pci->revision == 0x2)
+		codec->eld_jack_detect = 1; /* Jack-detection by ELD */
+
+	return 0;
+}
+
 /*
  * patch entries
  */
 static const struct hda_device_id snd_hda_id_hdmi[] = {
-HDA_CODEC_ENTRY(0x00147a47, "Loongson HDMI",	patch_generic_hdmi),
+HDA_CODEC_ENTRY(0x00147a47, "Loongson HDMI",	patch_loongson_hdmi),
 HDA_CODEC_ENTRY(0x1002793c, "RS600 HDMI",	patch_atihdmi),
 HDA_CODEC_ENTRY(0x10027919, "RS600 HDMI",	patch_atihdmi),
 HDA_CODEC_ENTRY(0x1002791a, "RS690/780 HDMI",	patch_atihdmi),
