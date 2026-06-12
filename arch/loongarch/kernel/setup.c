@@ -370,6 +370,7 @@ void __init setup_arch(char **cmdline_p)
 {
 	cpu_probe();
 	*cmdline_p = boot_command_line;
+	set_current(current);
 
 	early_init();
 	pagetable_init();

@@ -65,7 +65,7 @@ void output_task_defines(void)
 {
 	COMMENT("LoongArch task_struct offsets.");
 	OFFSET(TASK_STATE, task_struct, state);
-	OFFSET(TASK_THREAD_INFO, task_struct, stack);
+	OFFSET(TASK_STACK, task_struct, stack);
 	OFFSET(TASK_FLAGS, task_struct, flags);
 	OFFSET(TASK_MM, task_struct, mm);
 	OFFSET(TASK_PID, task_struct, pid);
@@ -76,7 +76,6 @@ void output_task_defines(void)
 void output_thread_info_defines(void)
 {
 	COMMENT("LoongArch thread_info offsets.");
-	OFFSET(TI_TASK, thread_info, task);
 	OFFSET(TI_FLAGS, thread_info, flags);
 	OFFSET(TI_TP_VALUE, thread_info, tp_value);
 	OFFSET(TI_CPU, thread_info, cpu);
@@ -260,8 +259,9 @@ void output_signal_defines(void)
 void output_smpboot_defines(void)
 {
 	COMMENT("Linux smp cpu boot offsets.");
+	OFFSET(CPU_BOOT_TASK, secondary_data, task);
 	OFFSET(CPU_BOOT_STACK, secondary_data, stack);
-	OFFSET(CPU_BOOT_TINFO, secondary_data, thread_info);
+	OFFSET(CPU_BOOT_OFFSET, secondary_data, offset);
 	BLANK();
 }
 #endif

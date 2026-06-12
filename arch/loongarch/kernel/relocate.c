@@ -339,7 +339,7 @@ void *__init relocate_kernel(void)
 		memcpy(RELOCATED(&__bss_start), &__bss_start, bss_length);
 
 		/* The current thread is now within the relocated image */
-		__current_thread_info = RELOCATED(__current_thread_info);
+		current_thread_pointer = RELOCATED(current_thread_pointer);
 
 		/* Return the new kernel's entry point */
 		kernel_entry = RELOCATED(start_kernel);

@@ -102,7 +102,12 @@ void save_stack_trace_tsk(struct task_struct *tsk,
 
 	WARN_ON(trace->nr_entries || !trace->max_entries);
 
+	if (!try_get_task_stack(tsk))
+		return;
+
 	save_context_stack(tsk, trace, NULL, consume);
+
+	put_task_stack(tsk);
 }
 EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
 

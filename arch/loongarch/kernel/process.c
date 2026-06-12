@@ -43,6 +43,8 @@
 #include <asm/unwind.h>
 #include <asm/vdso.h>
 
+DEFINE_PER_CPU(struct task_struct *, cpu_tasks);
+
 /*
  * Idle related variables and functions
  */

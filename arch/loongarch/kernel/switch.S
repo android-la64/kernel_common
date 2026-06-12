@@ -17,7 +17,6 @@
 
 /*
  * task_struct *__switch_to(task_struct *prev, task_struct *next,
- *			    struct thread_info *next_ti,
  *			    void *sched_ra, void *sched_cfa)
  */
 	.align	5
@@ -27,13 +26,14 @@ SYM_FUNC_START(__switch_to)
 
 	cpu_save_nonscratch a0
 	stptr.d	ra, a0, THREAD_REG01
-	stptr.d a3, a0, THREAD_SCHED_RA
-	stptr.d a4, a0, THREAD_SCHED_CFA
-	move	tp, a2
+	stptr.d a2, a0, THREAD_SCHED_RA
+	stptr.d a3, a0, THREAD_SCHED_CFA
+	move	tp, a1
 	cpu_restore_nonscratch a1
 
-	li.w	t0, _THREAD_SIZE
-	PTR_ADD	t0, t0, tp
+	ldptr.d		t0, a1, TASK_STACK
+	li.w		t1, _THREAD_SIZE
+	PTR_ADD		t0, t0, t1
 	set_saved_sp	t0, t1, t2
 
 	ldptr.d	t1, a1, THREAD_CSRPRMD

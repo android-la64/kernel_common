@@ -204,6 +204,7 @@ asmlinkage void start_secondary(void)
 	set_my_cpu_offset(per_cpu_offset(cpu));
 
 	cpu_probe();
+	set_current(current);
 	constant_clockevent_init();
 	mp_ops->init_secondary();
 
