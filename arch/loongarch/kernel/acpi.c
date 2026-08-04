@@ -12,6 +12,7 @@
 #include <linux/efi-bgrt.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/kvm_host.h>
 #include <linux/memblock.h>
 #include <linux/serial_core.h>
 #include <asm/io.h>
@@ -31,6 +32,8 @@ enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_LPIC;
 u64 acpi_saved_sp;
 
 #define PREFIX			"ACPI: "
+
+#define MAX(a, b)		((a) > (b) ? (a) : (b))
 
 struct acpi_madt_core_pic acpi_core_pic[MAX_CORE_PIC];
 
@@ -366,7 +369,7 @@ static void __init acpi_process_madt(void)
 
 int pptt_enabled;
 static int acpi_nr_packages;
-static int acpi_package_ids[MAX_PACKAGES];
+static int acpi_package_ids[MAX(MAX_PACKAGES, KVM_MAX_VCPUS)];
 
 int __init parse_acpi_topology(void)
 {
