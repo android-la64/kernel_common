@@ -9,6 +9,7 @@
 #include <asm/cpu-features.h>
 #include <asm/unaligned.h>
 
+static DEFINE_STATIC_KEY_FALSE(have_ual);
 static DEFINE_STATIC_KEY_FALSE(have_crc32);
 
 extern u32 __pure crc32_le_base(u32 crc, unsigned char const *p, size_t len);
@@ -26,6 +27,30 @@ do {							\
 #define CRC32(crc, value, size)		_CRC32(crc, value, size, crc)
 #define CRC32C(crc, value, size)	_CRC32(crc, value, size, crcc)
 
+static inline u16 get_le16(const void *p)
+{
+	if (static_branch_likely(&have_ual))
+		return *((__le16 *)p);
+	else
+		return get_unaligned_le16(p);
+}
+
+static inline u32 get_le32(const void *p)
+{
+	if (static_branch_likely(&have_ual))
+		return *((__le32 *)p);
+	else
+		return get_unaligned_le32(p);
+}
+
+static inline u64 get_le64(const void *p)
+{
+	if (static_branch_likely(&have_ual))
+		return *((__le64 *)p);
+	else
+		return get_unaligned_le64(p);
+}
+
 u32 __pure crc32_le(u32 crc_, unsigned char const *p, size_t len)
 {
 	u32 crc = crc_;
@@ -34,7 +59,7 @@ u32 __pure crc32_le(u32 crc_, unsigned char const *p, size_t len)
 		return crc32_le_base(crc, p, len);
 
 	while (len >= sizeof(u64)) {
-		u64 value = get_unaligned_le64(p);
+		u64 value = get_le64(p);
 
 		CRC32(crc, value, d);
 		p += sizeof(u64);
@@ -42,14 +67,14 @@ u32 __pure crc32_le(u32 crc_, unsigned char const *p, size_t len)
 	}
 
 	if (len & sizeof(u32)) {
-		u32 value = get_unaligned_le32(p);
+		u32 value = get_le32(p);
 
 		CRC32(crc, value, w);
 		p += sizeof(u32);
 	}
 
 	if (len & sizeof(u16)) {
-		u16 value = get_unaligned_le16(p);
+		u16 value = get_le16(p);
 
 		CRC32(crc, value, h);
 		p += sizeof(u16);
@@ -72,7 +97,7 @@ u32 __pure __crc32c_le(u32 crc_, unsigned char const *p, size_t len)
 		return __crc32c_le_base(crc, p, len);
 
 	while (len >= sizeof(u64)) {
-		u64 value = get_unaligned_le64(p);
+		u64 value = get_le64(p);
 
 		CRC32C(crc, value, d);
 		p += sizeof(u64);
@@ -80,14 +105,14 @@ u32 __pure __crc32c_le(u32 crc_, unsigned char const *p, size_t len)
 	}
 
 	if (len & sizeof(u32)) {
-		u32 value = get_unaligned_le32(p);
+		u32 value = get_le32(p);
 
 		CRC32C(crc, value, w);
 		p += sizeof(u32);
 	}
 
 	if (len & sizeof(u16)) {
-		u16 value = get_unaligned_le16(p);
+		u16 value = get_le16(p);
 
 		CRC32C(crc, value, h);
 		p += sizeof(u16);
@@ -104,6 +129,8 @@ u32 __pure __crc32c_le(u32 crc_, unsigned char const *p, size_t len)
 
 static int __init crc32_mod_init(void)
 {
+	if (cpu_has_ual)
+		static_branch_enable(&have_ual);
 	if (cpu_has_crc32)
 		static_branch_enable(&have_crc32);
 	return 0;
