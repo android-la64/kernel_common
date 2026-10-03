@@ -16,11 +16,26 @@
 #  define DEBUGP(fmt, args...)
 #endif
 
+struct _ctx_layout {
+	struct sctx_info *addr;
+	unsigned int size;		/* used at save context */
+};
+
+struct extctx_layout {
+	unsigned long size;
+	unsigned int flags;
+	struct _ctx_layout fpu;
+	struct _ctx_layout lsx;
+	struct _ctx_layout lasx;
+	struct _ctx_layout lbt;
+	struct _ctx_layout end;
+};
+
 /*
  * Determine which stack to use..
  */
 extern void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
-				 size_t frame_size);
+				 struct extctx_layout *extctx);
 /* Check and clear pending FPU exceptions in saved CSR */
 extern int fcsr_pending(unsigned int __user *fcsr);
 
