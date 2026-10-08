@@ -11,6 +11,7 @@
 #include <linux/of_fdt.h>
 #include <asm/early_ioremap.h>
 #include <asm/bootinfo.h>
+#include <asm/numa.h>
 #include <loongson.h>
 
 u64 efi_system_table;
@@ -23,7 +24,7 @@ static void __init register_addrs_set(u64 *registers, const u64 addr, int num)
 	u64 i;
 
 	for (i = 0; i < num; i++) {
-		*registers = (i << 44) | addr;
+		*registers = nid_to_addrbase(i) | addr;
 		registers++;
 	}
 }
